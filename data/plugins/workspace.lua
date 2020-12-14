@@ -18,23 +18,6 @@ local function serialize(val)
 end
 
 
-local function has_no_locked_children(node)
-  if node.locked then return false end
-  if node.type == "leaf" then return true end
-  return has_no_locked_children(node.a) and has_no_locked_children(node.b)
-end
-
-
-local function get_unlocked_root(node)
-  if node.type == "leaf" then
-    return not node.locked and node
-  end
-  if has_no_locked_children(node) then
-    return node
-  end
-  return get_unlocked_root(node.a) or get_unlocked_root(node.b)
-end
-
 
 local function save_view(view)
   local mt = getmetatable(view)
@@ -124,7 +107,7 @@ end
 
 
 local function save_workspace()
-  local root = get_unlocked_root(core.root_view.root_node)
+  local root = core.root_view:get_primary_node()
   local fp = io.open(workspace_filename, "w")
   if fp then
     fp:write("return ", serialize(save_node(root)), "\n")
@@ -137,7 +120,7 @@ local function load_workspace()
   local ok, t = pcall(dofile, workspace_filename)
   os.remove(workspace_filename)
   if ok then
-    local root = get_unlocked_root(core.root_view.root_node)
+    local root = core.root_view:get_primary_node()
     local active_view = load_node(root, t)
     if active_view then
       core.set_active_view(active_view)
