@@ -233,7 +233,7 @@ local function create_user_directory()
       error("cannot create directory: \"" .. dirname_create .. "\"")
     end
   end
-  for _, modname in ipairs {'plugins', 'colors'} do
+  for _, modname in ipairs {'plugins', 'colors', 'fonts'} do
     local subdirname = dirname_create .. '/' .. modname
     if not system.mkdir(subdirname) then
       error("cannot create directory: \"" .. subdirname .. "\"")
@@ -269,8 +269,8 @@ local style = require "core.style"
 ------------------------------- Fonts ----------------------------------------
 
 -- customize fonts:
--- style.font = renderer.font.load(DATADIR .. "/fonts/font.ttf", 14 * SCALE)
--- style.code_font = renderer.font.load(DATADIR .. "/fonts/monospace.ttf", 13.5 * SCALE)
+-- style.font = renderer.font.load(DATADIR .. "/fonts/font.ttf", 12 * SCALE)
+-- style.code_font = renderer.font.load(DATADIR .. "/fonts/monospace.ttf", 12 * SCALE)
 --
 -- font names used by lite:
 -- style.font      : user interface
@@ -459,16 +459,35 @@ function core.confirm_close_all()
   end
   if dirty_count > 0 then
     local text
+    local choice
     if dirty_count == 1 then
-      text = string.format("\"%s\" has unsaved changes. Quit anyway?", dirty_name)
+      text = string.format("%s has unsaved changes. Quit anyway?", common.home_encode(dirty_name))
     else
       text = string.format("%d docs have unsaved changes. Quit anyway?", dirty_count)
     end
-    local confirm = system.show_confirm_dialog("Unsaved Changes", text)
-    if not confirm then return false end
+
+    if system.window_has_focus() then
+      core.command_view:enter(text, function(_, item)
+        if item.text:match("^[yY]") then core.quit(true) end
+      end, function(text)
+        local items = {}
+        if not text:find("^[^yY]") then table.insert(items, "Yes") end
+        if not text:find("^[^nN]") then table.insert(items, "No") end
+        return items
+      end)
+      return false
+    else
+      local confirm = system.show_confirm_dialog("Unsaved Changes", text)
+      if confirm then 
+        return true
+      else
+        return false
+      end
+    end
   end
   return true
 end
+
 
 local temp_uid = (system.get_time() * 1000) % 0xffffffff
 local temp_file_prefix = string.format(".lite_temp_%08x", temp_uid)
@@ -541,9 +560,12 @@ function core.load_plugins()
       if config[basename] ~= false then
         local modname = "plugins." .. basename
         local ok = core.try(require, modname)
-        if ok then
-          core.log_quiet("Loaded plugin %q", modname)
-        else
+        -- Normally a log line is added for each loaded plugin which is a
+        -- good thing. Unfortunately we load the user module before the plugins
+        -- so all the messages here can fill the log screen and hide an evential
+        -- user module's error.
+        -- if ok then core.log_quiet("Loaded plugin %q", modname) end
+        if not ok then
           no_errors = false
         end
       end
