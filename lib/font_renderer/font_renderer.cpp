@@ -72,8 +72,9 @@ int FR_Load_Font(FR_Renderer *font_renderer, const char *filename) {
     bool success = font_renderer->renderer_alpha().load_font(filename);
     if (success) {
         std::string fullname = filename;
-        size_t lastindex = fullname.find_last_of(".");
-        font_renderer->debug_font_name = fullname.substr(0, lastindex);
+        size_t a = fullname.find_last_of("/");
+        size_t b = fullname.find_last_of(".");
+        font_renderer->debug_font_name = fullname.substr(a + 1, b - a - 1);
     }
     return (success ? 0 : 1);
 }
