@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+
 #include "font_renderer.h"
 
 #include "agg_lcd_distribution_lut.h"
@@ -6,12 +8,15 @@
 
 #include "font_renderer_alpha.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 // Important: when a subpixel scale is used the width below will be the width in logical pixel.
 // As each logical pixel contains 3 subpixels it means that the 'pixels' pointer
 // will hold enough space for '3 * width' uint8_t values.
 struct FR_Bitmap {
-  agg::int8u *pixels;
-  int width, height;
+    agg::int8u *pixels;
+    int width, height;
 };
 
 class FR_Renderer {
@@ -28,6 +33,8 @@ public:
     font_renderer_alpha& renderer_alpha() { return m_renderer; }
     agg::lcd_distribution_lut& lcd_distribution_lut() { return m_lcd_lut; }
     int subpixel_scale() const { return (m_subpixel ? 3 : 1); }
+
+    std::string debug_font_name;
 
 private:
     font_renderer_alpha m_renderer;
@@ -63,6 +70,11 @@ void FR_Renderer_Free(FR_Renderer *font_renderer) {
 
 int FR_Load_Font(FR_Renderer *font_renderer, const char *filename) {
     bool success = font_renderer->renderer_alpha().load_font(filename);
+    if (success) {
+        std::string fullname = filename;
+        size_t lastindex = fullname.find_last_of(".");
+        font_renderer->debug_font_name = fullname.substr(0, lastindex);
+    }
     return (success ? 0 : 1);
 }
 
@@ -236,6 +248,11 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
         x = x_next_i + 2 * subpixel_scale;
     }
     delete [] cover_swap_buffer;
+
+    std::string image_filename = fmt::format("{}-{}-{}.png", font_renderer->debug_font_name, first_char, font_height);
+    fmt::print("{}\n", image_filename);
+    stbi_write_png(image_filename.c_str(), subpixel_scale * image->width, image->height, 1, image->pixels, subpixel_scale * image->width);
+
     return res;
 }
 
