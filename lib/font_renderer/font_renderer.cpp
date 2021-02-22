@@ -207,6 +207,34 @@ static int ceil_to_multiple(int n, int p) {
     return p * ((n + p - 1) / p);
 }
 
+static void debug_rgb_image_write_glyphs_bbox(FR_Bitmap *rgb_image,
+    int subpixel_scale, int num_chars,
+    FR_Bitmap_Glyph_Metrics *glyphs, agg::int32u color)
+{
+    const int rgb_comp = 3;
+    for (int i = 0; i < num_chars; i++) {
+        FR_Bitmap_Glyph_Metrics& gi = glyphs[i];
+
+        int y = gi.y0;
+        agg::int8u *row = rgb_image->pixels + (rgb_image->width * y + gi.x0) * rgb_comp;
+        for (int x = gi.x0; x < gi.x1; x++) {
+            row[0] = (color >> 0 ) & 0xff; // (agg::int32u) row[0] * (((color >> 0 ) & 0xff) + 1) / 256;
+            row[1] = (color >> 8 ) & 0xff; // (agg::int32u) row[1] * (((color >> 8 ) & 0xff) + 1) / 256;
+            row[2] = (color >> 16) & 0xff; // (agg::int32u) row[2] * (((color >> 16) & 0xff) + 1) / 256;
+            row += rgb_comp;
+        }
+
+        y = gi.y1;
+        row = rgb_image->pixels + (rgb_image->width * y + gi.x0) * rgb_comp;
+        for (int x = gi.x0; x < gi.x1; x++) {
+            row[0] = (color >> 0 ) & 0xff; // (agg::int32u) row[0] * (((color >> 0 ) & 0xff) + 1) / 256;
+            row[1] = (color >> 8 ) & 0xff; // (agg::int32u) row[1] * (((color >> 8 ) & 0xff) + 1) / 256;
+            row[2] = (color >> 16) & 0xff; // (agg::int32u) row[2] * (((color >> 16) & 0xff) + 1) / 256;
+            row += rgb_comp;
+        }
+    }
+}
+
 int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
     FR_Bitmap *image,
     int first_char, int num_chars, FR_Bitmap_Glyph_Metrics *glyphs)
@@ -281,12 +309,15 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
     }
     delete [] cover_swap_buffer;
 
-    std::string image_filename = fmt::format("{}-{}-{}.png", font_renderer->debug_font_name, first_char, font_height);
-    fmt::print("{}\n", image_filename);
+    if (res == 0) {
+        std::string image_filename = fmt::format("{}-{}-{}.png", font_renderer->debug_font_name, first_char, font_height);
+        fmt::print("{}\n", image_filename);
 
-    FR_Bitmap *rgb_image = debug_bitmap_to_image_rgb(image, subpixel_scale);
-    stbi_write_png(image_filename.c_str(), rgb_image->width, rgb_image->height, 3, rgb_image->pixels, rgb_image->width * 3);
-    FR_Bitmap_Free(rgb_image);
+        FR_Bitmap *rgb_image = debug_bitmap_to_image_rgb(image, subpixel_scale);
+        debug_rgb_image_write_glyphs_bbox(rgb_image, subpixel_scale, num_chars, glyphs, 0x00ff00);
+        stbi_write_png(image_filename.c_str(), rgb_image->width, rgb_image->height, 3, rgb_image->pixels, rgb_image->width * 3);
+        FR_Bitmap_Free(rgb_image);
+    }
 
     return res;
 }
