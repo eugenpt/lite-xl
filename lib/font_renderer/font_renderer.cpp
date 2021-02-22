@@ -19,6 +19,37 @@ struct FR_Bitmap {
     int width, height;
 };
 
+static FR_Bitmap *debug_bitmap_to_image_rgb(FR_Bitmap *alpha_bitmap, const int subpixel_scale) {
+    const int w = alpha_bitmap->width, h = alpha_bitmap->height;
+    const int rgb_comp = 3;
+
+    fmt::print("W: {} H: {}\n", w, h);
+
+    FR_Bitmap *rgb_image = (FR_Bitmap *) malloc(sizeof(FR_Bitmap) + w * h * rgb_comp);
+    if (!rgb_image) { return nullptr; }
+    rgb_image->pixels = (agg::int8u *) (rgb_image + 1);
+    rgb_image->width = w;
+    rgb_image->height = h;
+
+    agg::int8u *dst_ptr = rgb_image->pixels, *src_ptr = alpha_bitmap->pixels;
+    for (int y = 0; y < alpha_bitmap->height; y++) {
+        for (int x = 0; x < alpha_bitmap->width; x++) {
+            if (subpixel_scale == 3) {
+                dst_ptr[0] = 0xff - src_ptr[0];
+                dst_ptr[1] = 0xff - src_ptr[1];
+                dst_ptr[2] = 0xff - src_ptr[2];
+            } else {
+                dst_ptr[0] = 0xff - src_ptr[0];
+                dst_ptr[1] = 0xff - src_ptr[0];
+                dst_ptr[2] = 0xff - src_ptr[0];
+            }
+            src_ptr += subpixel_scale;
+            dst_ptr += rgb_comp;
+        }
+    }
+    return rgb_image;
+}
+
 class FR_Renderer {
 public:
     // Conventional LUT values: (1./3., 2./9., 1./9.)
@@ -252,7 +283,10 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
 
     std::string image_filename = fmt::format("{}-{}-{}.png", font_renderer->debug_font_name, first_char, font_height);
     fmt::print("{}\n", image_filename);
-    stbi_write_png(image_filename.c_str(), subpixel_scale * image->width, image->height, 1, image->pixels, subpixel_scale * image->width);
+
+    FR_Bitmap *rgb_image = debug_bitmap_to_image_rgb(image, subpixel_scale);
+    stbi_write_png(image_filename.c_str(), rgb_image->width, rgb_image->height, 3, rgb_image->pixels, rgb_image->width * 3);
+    FR_Bitmap_Free(rgb_image);
 
     return res;
 }
