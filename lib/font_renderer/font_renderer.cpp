@@ -253,7 +253,6 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
     renderer_alpha.get_font_vmetrics(ascender, descender);
 
     const int ascender_px  = int(ascender * font_height);
-    const int descender_px = ascender_px - font_height;
 
     const int pad_y = 1;
 
@@ -328,7 +327,7 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
         glyph_trim_rect(ren_buf, glyph_info, subpixel_scale);
 
         // When subpixel is activated we need one padding pixel on the left and on the right.
-        x = x_next_i + 2 * subpixel_scale;
+        x = x + gbounds.x2 + 2 * subpixel_scale;
     }
     delete [] cover_swap_buffer;
 
