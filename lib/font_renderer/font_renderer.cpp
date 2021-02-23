@@ -255,8 +255,7 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
     const int ascender_px  = int(ascender * font_height);
     const int descender_px = ascender_px - font_height;
 
-    const int pad_y = font_height / 10;
-    const int y_step = font_height + 2 * pad_y;
+    const int pad_y = 1;
 
     agg::rendering_buffer ren_buf(pixels, pixels_width * subpixel_scale, pixels_height, -pixels_width * subpixel_scale * pixel_size);
     // When using subpixel font rendering it is needed to leave a padding pixel on the left and on the right.
@@ -272,17 +271,29 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
 #endif
     renderer_alpha.set_font_height(font_height_reduced);
     agg::int8u *cover_swap_buffer = new agg::int8u[pixels_width * subpixel_scale];
+    int y_bottom = y;
+    fmt::print("y: {}\n", y);
     for (int i = 0; i < num_chars; i++) {
         int codepoint = first_char + i;
         if (x + font_height * subpixel_scale > pixels_width * subpixel_scale) {
             x = x_start;
-            y -= y_step;
+            y = y_bottom;
+            fmt::print("y: {}\n", y);
         }
-        if (y - y_step < 0) {
+
+        agg::rect_i gbounds;
+        renderer_alpha.codepoint_bounds(codepoint, subpixel_scale, gbounds);
+        // fmt::print("bounds ({} {}) ({} {})\n", gbounds.x1, gbounds.y1, gbounds.x2, gbounds.y2);
+
+        const int y_baseline = y - pad_y - gbounds.y2;
+        const int glyph_y_bottom = y - 2 * pad_y - (gbounds.y2 - gbounds.y1);
+        y_bottom = (y_bottom > glyph_y_bottom ? glyph_y_bottom : y_bottom);
+
+        if (y_bottom < 0) {
             res = -1;
+            fmt::print("bitmap too small: retry\n");
             break;
         }
-        const int y_baseline = y - pad_y - ascender_px;
 
         double x_next = x, y_next = y_baseline;
         renderer_alpha.render_codepoint(ren_buf, text_color, x_next, y_next, codepoint, subpixel_scale);
@@ -291,12 +302,13 @@ int FR_Bake_Font_Bitmap(FR_Renderer *font_renderer, int font_height,
         // Below x and x_next_i will always be integer multiples of subpixel_scale.
         FR_Bitmap_Glyph_Metrics& glyph_info = glyphs[i];
         glyph_info.x0 = x / subpixel_scale;
-        glyph_info.y0 = pixels_height - 1 - (y_baseline + ascender_px  + pad_y); // FIXME: add -1 ?
+        // FIXME: the y between parenthesis below is = y.
+        glyph_info.y0 = pixels_height - 1 - (y_baseline + gbounds.y2 + pad_y);
         glyph_info.x1 = x_next_i / subpixel_scale;
-        glyph_info.y1 = pixels_height - 1 - (y_baseline + descender_px - pad_y); // FIXME: add -1 ?
+        glyph_info.y1 = pixels_height - 1 - (y_baseline + gbounds.y1 - pad_y);
 
         glyph_info.xoff = 0;
-        glyph_info.yoff = -pad_y;
+        glyph_info.yoff = -pad_y - gbounds.y2 + ascender_px;
         glyph_info.xadvance = (x_next - x) / subpixel_scale;
 
         if (subpixel_scale != 1 && glyph_info.x1 > glyph_info.x0) {
